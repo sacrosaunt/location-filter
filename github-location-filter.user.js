@@ -3,7 +3,7 @@
 // @namespace    http://tampermonkey.net/
 // @version      1.3
 // @description  Makes GitHub job listing tables user-friendly by adding location-based filtering with customizable city dropdown - Perfect for browsing careers pages
-// @author       You
+// @author       sacrosaunt
 // @match        https://github.com/*
 // @grant        GM_setValue
 // @grant        GM_getValue
