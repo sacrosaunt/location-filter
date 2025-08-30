@@ -15,27 +15,18 @@ A Tampermonkey userscript that makes GitHub job listing tables user-friendly by 
 ## Installation
 
 ### Option 1: Easy Installation via Greasy Fork (Recommended)
-1. Click the [Install button on Greasy Fork](https://greasyfork.org/en/scripts/547666-github-location-filter)
-2. Your userscript manager will automatically install the script
-3. That's it! The script will work immediately on GitHub
+Click this button:
+
+[![Install](https://img.shields.io/badge/Install-Greasy%20Fork-brightgreen)](https://greasyfork.org/en/scripts/547666-github-location-filter)
 
 ### Option 2: Manual Installation
-**Prerequisites:**
-You need a userscript manager browser extension:
-- [Tampermonkey](https://www.tampermonkey.net/) (Chrome, Firefox, Safari, Edge)
-- [Greasemonkey](https://www.greasespot.net/) (Firefox)
-- [Violentmonkey](https://violentmonkey.github.io/) (Chrome, Firefox, Edge)
 
-**Install the Script:**
-1. Install a userscript manager (Tampermonkey recommended)
-2. Click on the userscript manager icon in your browser
-3. Select "Create a new script" or "Add new script"
-4. Copy and paste the contents of `github-location-filter.user.js` into the editor
-5. Save the script (Ctrl+S or Cmd+S)
+**Steps:**
+1. Install a userscript manager [Tampermonkey](https://www.tampermonkey.net/), [Greasemonkey](https://www.greasespot.net/), or [Violentmonkey](https://violentmonkey.github.io/)
+2. Create a new script
+3. Copy and paste the contents of `github-location-filter.user.js`
+4. Save the script
 
-**Alternative manual method:**
-1. Open your userscript manager dashboard
-2. Drag and drop the `github-location-filter.user.js` file onto the dashboard
 
 ## Usage
 
