@@ -97,7 +97,7 @@
         const styles = `
             #location-filter-interface {
                 position: fixed;
-                top: 20px;
+                top: 0;
                 right: 20px;
                 width: 280px;
                 background: #1976d2;
@@ -109,6 +109,8 @@
                 font-size: 14px;
                 transition: all 0.3s ease;
                 overflow: hidden;
+                margin-top: 100px;
+                scroll-behavior: smooth;
             }
 
             #location-filter-interface.collapsed {
@@ -286,6 +288,21 @@
                 color: #999;
                 font-style: italic;
                 font-size: 12px;
+            }
+
+            /* Responsive positioning for different screen sizes */
+            @media (max-width: 768px) {
+                #location-filter-interface {
+                    right: 10px;
+                    width: 260px;
+                }
+            }
+
+            @media (max-width: 480px) {
+                #location-filter-interface {
+                    right: 5px;
+                    width: 240px;
+                }
             }
 
             /* Dark mode styles */
@@ -651,6 +668,37 @@
         return false;
     }
 
+    // Throttle function for performance
+    function throttle(func, limit) {
+        let inThrottle;
+        return function() {
+            const args = arguments;
+            const context = this;
+            if (!inThrottle) {
+                func.apply(context, args);
+                inThrottle = true;
+                setTimeout(() => inThrottle = false, limit);
+            }
+        }
+    }
+
+    // Function to adjust filter position based on header height
+    function adjustFilterPosition() {
+        const filterInterface = document.getElementById('location-filter-interface');
+        if (!filterInterface) return;
+        
+        // Find the GitHub header
+        const header = document.querySelector('.AppHeader');
+        if (header) {
+            const headerHeight = header.offsetHeight;
+            // Add some padding (20px) below the header
+            filterInterface.style.marginTop = (headerHeight + 20) + 'px';
+        } else {
+            // Fallback if header not found - use a reasonable default
+            filterInterface.style.marginTop = '100px';
+        }
+    }
+
     // Initialize when DOM is ready
     function initialize() {
         // Check if there are any tables with location columns
@@ -666,6 +714,9 @@
         const savedFilterState = loadFilterStateFromStorage();
         
         createDropdownInterface();
+        
+        // Adjust position after creating interface
+        setTimeout(adjustFilterPosition, 100);
         
         // Restore filter state if it was previously enabled
         if (savedFilterState && targetCities.length > 0) {
@@ -685,6 +736,18 @@
             childList: true,
             subtree: true
         });
+        
+        // Listen for window resize to adjust position (throttled)
+        window.addEventListener('resize', throttle(adjustFilterPosition, 100));
+        
+        // Listen for scroll to ensure filter stays visible (throttled)
+        window.addEventListener('scroll', throttle(adjustFilterPosition, 100));
+        
+        // Listen for navigation changes (GitHub uses pjax)
+        document.addEventListener('pjax:end', adjustFilterPosition);
+        
+        // Also adjust position periodically to catch any dynamic changes
+        setInterval(adjustFilterPosition, 2000);
     }
 
     // Initialize when DOM is ready
