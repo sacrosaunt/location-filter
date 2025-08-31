@@ -108,7 +108,7 @@
                 position: fixed;
                 top: 100px;
                 right: 20px;
-                width: 200px;
+                width: 240px;
                 background: #1976d2;
                 border: 2px solid #1976d2;
                 border-radius: 8px;
@@ -116,9 +116,9 @@
                 z-index: 10000;
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 font-size: 14px;
-                transition: width 0.3s ease;
+                transition: none;
                 overflow: hidden;
-                scroll-behavior: smooth;
+                scroll-behavior: auto;
                 transform-origin: right top;
                 user-select: none;
                 -webkit-user-select: none;
@@ -132,8 +132,7 @@
             }
 
             #location-filter-interface.repositioning {
-                transition: left 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), 
-                           top 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+                transition: none;
             }
 
             /* Ensure dragging always disables transitions, even if repositioning is active */
@@ -142,7 +141,7 @@
             }
 
             #location-filter-interface:not(.collapsed) {
-                width: 280px;
+                width: 240px;
             }
 
             #location-filter-interface.active {
@@ -198,7 +197,7 @@
                 padding: 3px 8px;
                 border-radius: 12px;
                 font-weight: 500;
-                transition: all 0.2s;
+                transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
                 min-width: 35px;
                 user-select: none;
                 -webkit-user-select: none;
@@ -243,7 +242,8 @@
             }
 
             #city-input {
-                flex: 1;
+                flex: 0 0 140px;
+                width: 140px;
                 padding: 6px 8px;
                 border: 1px solid #ddd;
                 border-radius: 4px;
@@ -331,19 +331,27 @@
             /* Responsive width adjustments */
             @media (max-width: 768px) {
                 #location-filter-interface {
-                    width: 180px;
+                    width: 220px;
                 }
                 #location-filter-interface:not(.collapsed) {
-                    width: 260px;
+                    width: 220px;
+                }
+                #city-input {
+                    flex-basis: 130px;
+                    width: 130px;
                 }
             }
 
             @media (max-width: 480px) {
                 #location-filter-interface {
-                    width: 160px;
+                    width: 200px;
                 }
                 #location-filter-interface:not(.collapsed) {
-                    width: 240px;
+                    width: 200px;
+                }
+                #city-input {
+                    flex-basis: 120px;
+                    width: 120px;
                 }
             }
 
@@ -442,22 +450,13 @@
                 height = rect.height;
             }
         } else {
-            // Use computed dimensions to account for potential state changes
-            const computedStyle = window.getComputedStyle(container);
-            const isCollapsed = container.classList.contains('collapsed');
-            
-            // Get width based on collapsed state
-            if (isCollapsed) {
-                width = 200; // collapsed width
+            // Use fixed width by viewport to keep width constant across states
+            if (viewportWidth <= 480) {
+                width = 200;
+            } else if (viewportWidth <= 768) {
+                width = 220;
             } else {
-                // Expanded width varies by screen size
-                if (viewportWidth <= 480) {
-                    width = 240;
-                } else if (viewportWidth <= 768) {
-                    width = 260;
-                } else {
-                    width = 280;
-                }
+                width = 240;
             }
             
             const rect = container.getBoundingClientRect();
