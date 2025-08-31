@@ -132,7 +132,7 @@
             }
 
             #location-filter-interface.repositioning {
-                transition: none;
+                transition: left 0.3s ease, top 0.3s ease;
             }
 
             /* Ensure dragging always disables transitions, even if repositioning is active */
@@ -215,14 +215,19 @@
             }
 
             .filter-content {
-                padding: 15px;
-                display: block;
+                padding: 0 15px;
                 background: white;
                 border-radius: 0 0 6px 6px;
+                max-height: 0;
+                opacity: 0;
+                overflow: hidden;
+                transition: max-height 0.3s ease, opacity 0.2s ease, padding 0.3s ease;
             }
 
-            .filter-content.collapsed {
-                display: none;
+            .filter-content:not(.collapsed) {
+                padding: 15px;
+                max-height: 1000px; /* sufficient for content */
+                opacity: 1;
             }
 
             .city-input-section {
@@ -658,7 +663,15 @@
             ensureBoundsTimeoutId = setTimeout(() => {
                 ensureBoundsTimeoutId = null;
                 ensureWithinBounds();
-            }, 350); // Wait for CSS transition to complete (300ms + buffer)
+            }, 0); // Run on next tick so layout updates are applied, no extra delay
+        });
+
+        // After expand/collapse animation completes, re-ensure bounds in case height changed further
+        content.addEventListener('transitionend', (e) => {
+            if (e.target !== content) return;
+            if (e.propertyName === 'max-height' || e.propertyName === 'opacity' || e.propertyName === 'padding') {
+                ensureWithinBounds();
+            }
         });
 
         // Toggle filter on/off
@@ -977,17 +990,37 @@
         // For right-positioned interface, check if it goes off screen when expanded
         const rect = filterInterface.getBoundingClientRect();
         const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
         
+        let targetX = rect.left;
+        let targetY = rect.top;
+        let needsReposition = false;
+        
+        // Horizontal bounds
         if (rect.left < 15) {
-            // Interface is going off the left side, switch to manual positioning with animation
-            const newX = 15;
-            const newY = rect.top;
-            animatedRepositionToConstraints(newX, newY);
+            targetX = 15;
+            needsReposition = true;
         } else if (rect.right > viewportWidth - 15) {
-            // Interface is going off the right side, switch to manual positioning with animation
-            const newX = viewportWidth - rect.width - 15;
-            const newY = rect.top;
-            animatedRepositionToConstraints(newX, newY);
+            targetX = viewportWidth - rect.width - 15;
+            needsReposition = true;
+        }
+        
+        // Vertical bounds
+        if (rect.top < 15) {
+            targetY = 15;
+            needsReposition = true;
+        } else if (rect.bottom > viewportHeight - 15) {
+            targetY = Math.max(15, viewportHeight - rect.height - 15);
+            needsReposition = true;
+        }
+        
+        if (needsReposition) {
+            // Convert to left/top baseline at current visual position to allow smooth transition
+            filterInterface.style.left = rect.left + 'px';
+            filterInterface.style.top = rect.top + 'px';
+            filterInterface.style.right = 'auto';
+            
+            animatedRepositionToConstraints(targetX, targetY);
         }
     }
 
