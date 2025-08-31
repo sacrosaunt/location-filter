@@ -19,6 +19,15 @@
     let isFiltered = false;
     let originalRows = new Map();
 
+    // Drag state variables
+    let isDragging = false;
+    let dragStarted = false;
+    let dragOffset = { x: 0, y: 0 };
+    let currentPosition = { x: 0, y: 0 };
+    let ensureBoundsTimeoutId = null;
+    let dragRectWidth = null;
+    let dragRectHeight = null;
+
     // Storage functions
     function loadCitiesFromStorage() {
         try {
@@ -97,9 +106,9 @@
         const styles = `
             #location-filter-interface {
                 position: fixed;
-                top: 0;
+                top: 100px;
                 right: 20px;
-                width: 280px;
+                width: 200px;
                 background: #1976d2;
                 border: 2px solid #1976d2;
                 border-radius: 8px;
@@ -107,14 +116,33 @@
                 z-index: 10000;
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 font-size: 14px;
-                transition: all 0.3s ease;
+                transition: width 0.3s ease;
                 overflow: hidden;
-                margin-top: 100px;
                 scroll-behavior: smooth;
+                transform-origin: right top;
+                user-select: none;
+                -webkit-user-select: none;
+                -moz-user-select: none;
+                -ms-user-select: none;
             }
 
-            #location-filter-interface.collapsed {
-                width: 200px;
+            #location-filter-interface.dragging {
+                transition: none;
+                box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            }
+
+            #location-filter-interface.repositioning {
+                transition: left 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), 
+                           top 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            }
+
+            /* Ensure dragging always disables transitions, even if repositioning is active */
+            #location-filter-interface.repositioning.dragging {
+                transition: none;
+            }
+
+            #location-filter-interface:not(.collapsed) {
+                width: 280px;
             }
 
             #location-filter-interface.active {
@@ -129,11 +157,21 @@
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                cursor: pointer;
+                cursor: move;
                 transition: background-color 0.3s ease;
                 gap: 4px;
                 margin: -2px -2px 0 -2px;
                 border-radius: 8px 8px 0 0;
+                position: relative;
+            }
+
+            .filter-header:active {
+                cursor: grabbing;
+            }
+
+            .filter-header.dragging {
+                cursor: grabbing;
+                background: #1565c0;
             }
 
             .filter-header.active {
@@ -290,17 +328,21 @@
                 font-size: 12px;
             }
 
-            /* Responsive positioning for different screen sizes */
+            /* Responsive width adjustments */
             @media (max-width: 768px) {
                 #location-filter-interface {
-                    right: 10px;
+                    width: 180px;
+                }
+                #location-filter-interface:not(.collapsed) {
                     width: 260px;
                 }
             }
 
             @media (max-width: 480px) {
                 #location-filter-interface {
-                    right: 5px;
+                    width: 160px;
+                }
+                #location-filter-interface:not(.collapsed) {
                     width: 240px;
                 }
             }
@@ -380,20 +422,244 @@
         container.classList.add('collapsed');
     }
 
+    // Drag functionality
+    function constrainPosition(x, y, forceCurrentWidth = false) {
+        const container = document.getElementById('location-filter-interface');
+        if (!container) return { x, y };
+        
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        
+        // Get current dimensions, accounting for expanded/collapsed state
+        let width, height;
+        if (forceCurrentWidth) {
+            if (dragRectWidth !== null && dragRectHeight !== null) {
+                width = dragRectWidth;
+                height = dragRectHeight;
+            } else {
+                const rect = container.getBoundingClientRect();
+                width = rect.width;
+                height = rect.height;
+            }
+        } else {
+            // Use computed dimensions to account for potential state changes
+            const computedStyle = window.getComputedStyle(container);
+            const isCollapsed = container.classList.contains('collapsed');
+            
+            // Get width based on collapsed state
+            if (isCollapsed) {
+                width = 200; // collapsed width
+            } else {
+                // Expanded width varies by screen size
+                if (viewportWidth <= 480) {
+                    width = 240;
+                } else if (viewportWidth <= 768) {
+                    width = 260;
+                } else {
+                    width = 280;
+                }
+            }
+            
+            const rect = container.getBoundingClientRect();
+            height = rect.height;
+        }
+        
+        // Constrain to 15px from edges
+        const minX = 15;
+        const maxX = viewportWidth - width - 15;
+        const minY = 15;
+        const maxY = viewportHeight - height - 15;
+        
+        return {
+            x: Math.max(minX, Math.min(maxX, x)),
+            y: Math.max(minY, Math.min(maxY, y))
+        };
+    }
+
+    function updatePosition(x, y, animate = false) {
+        const container = document.getElementById('location-filter-interface');
+        if (!container) return;
+        
+        const constrained = constrainPosition(x, y);
+        currentPosition.x = constrained.x;
+        currentPosition.y = constrained.y;
+        
+        // Add animation class if needed
+        if (animate) {
+            container.classList.add('repositioning');
+            // Remove animation class after transition
+            setTimeout(() => {
+                container.classList.remove('repositioning');
+            }, 400);
+        }
+        
+        // Use left positioning for manual dragging
+        container.style.left = constrained.x + 'px';
+        container.style.top = constrained.y + 'px';
+        container.style.right = 'auto'; // Remove right positioning
+    }
+
+    function animatedRepositionToConstraints(x, y) {
+        if (isDragging) {
+            updatePosition(x, y, false);
+            return;
+        }
+        updatePosition(x, y, true);
+    }
+
+    function setInitialPosition() {
+        const container = document.getElementById('location-filter-interface');
+        if (!container) return;
+        
+        // Calculate initial position for right-aligned interface
+        const viewportWidth = window.innerWidth;
+        const rect = container.getBoundingClientRect();
+        
+        // Find the GitHub header
+        const header = document.querySelector('.AppHeader');
+        let topOffset = 120; // Default fallback
+        
+        if (header) {
+            topOffset = header.offsetHeight + 20; // 20px padding below header
+        }
+        
+        // Position in top-right corner with responsive margins
+        let rightMargin = 20;
+        if (viewportWidth <= 768) {
+            rightMargin = 15;
+        }
+        if (viewportWidth <= 480) {
+            rightMargin = 10;
+        }
+        
+        // Keep using CSS right positioning for initial state
+        container.style.right = rightMargin + 'px';
+        container.style.top = Math.max(topOffset, 15) + 'px';
+        container.style.left = 'auto';
+        
+        // Don't set currentPosition yet - let it remain 0,0 for initial state
+    }
+
+    function setupDragFunctionality() {
+        const header = document.getElementById('filter-header');
+        const container = document.getElementById('location-filter-interface');
+        
+        if (!header || !container) return;
+        
+        header.addEventListener('mousedown', (e) => {
+            // Only start drag on left mouse button
+            if (e.button !== 0) return;
+            
+            // Don't drag if clicking on the toggle button
+            if (e.target.id === 'toggle-filter-btn' || e.target.closest('.toggle-filter-btn')) {
+                return;
+            }
+            
+            isDragging = true;
+            dragStarted = false;
+            
+            const rect = container.getBoundingClientRect();
+            dragOffset.x = e.clientX - rect.left;
+            dragOffset.y = e.clientY - rect.top;
+            dragRectWidth = rect.width;
+            dragRectHeight = rect.height;
+            
+            // Set initial position if not already set
+            if (currentPosition.x === 0 && currentPosition.y === 0) {
+                currentPosition.x = rect.left;
+                currentPosition.y = rect.top;
+            }
+            
+            header.classList.add('dragging');
+            container.classList.add('dragging');
+            container.classList.remove('repositioning');
+
+            if (ensureBoundsTimeoutId) {
+                clearTimeout(ensureBoundsTimeoutId);
+                ensureBoundsTimeoutId = null;
+            }
+            
+            e.preventDefault();
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            dragStarted = true;
+            
+            const newX = e.clientX - dragOffset.x;
+            const newY = e.clientY - dragOffset.y;
+            
+            // Use current width during drag to ensure proper constraints
+            const constrained = constrainPosition(newX, newY, true);
+            currentPosition.x = constrained.x;
+            currentPosition.y = constrained.y;
+            
+            const container = document.getElementById('location-filter-interface');
+            if (container) {
+                container.style.left = constrained.x + 'px';
+                container.style.top = constrained.y + 'px';
+                container.style.right = 'auto';
+            }
+            
+            e.preventDefault();
+        });
+        
+        document.addEventListener('mouseup', (e) => {
+            if (!isDragging) return;
+            
+            isDragging = false;
+            header.classList.remove('dragging');
+            container.classList.remove('dragging');
+            dragRectWidth = null;
+            dragRectHeight = null;
+            
+            // Prevent click event if we actually dragged
+            if (dragStarted) {
+                setTimeout(() => {
+                    dragStarted = false;
+                }, 10);
+            }
+        });
+        
+        // Handle window resize to reposition if needed (throttled)
+        window.addEventListener('resize', throttle(() => {
+            if (isDragging) return;
+            if (currentPosition.x !== 0 || currentPosition.y !== 0) {
+                animatedRepositionToConstraints(currentPosition.x, currentPosition.y);
+            } else {
+                // If no manual position set, reposition automatically
+                adjustFilterPosition();
+            }
+        }, 100));
+    }
+
     function setupEventListeners() {
         // Toggle dropdown by clicking header
         const header = document.getElementById('filter-header');
         const content = document.getElementById('filter-content');
         const container = document.getElementById('location-filter-interface');
         
+        // Setup drag functionality
+        setupDragFunctionality();
+        
         header.addEventListener('click', (e) => {
-            // Don't toggle if clicking the toggle filter button
-            if (e.target.id === 'toggle-filter-btn') {
+            // Don't toggle if clicking the toggle filter button or if we just finished dragging
+            if (e.target.id === 'toggle-filter-btn' || dragStarted) {
                 return;
             }
             
             content.classList.toggle('collapsed');
             container.classList.toggle('collapsed', content.classList.contains('collapsed'));
+            
+            // Ensure interface stays within bounds after expansion/collapse
+            if (ensureBoundsTimeoutId) {
+                clearTimeout(ensureBoundsTimeoutId);
+            }
+            ensureBoundsTimeoutId = setTimeout(() => {
+                ensureBoundsTimeoutId = null;
+                ensureWithinBounds();
+            }, 350); // Wait for CSS transition to complete (300ms + buffer)
         });
 
         // Toggle filter on/off
@@ -682,20 +948,47 @@
         }
     }
 
-    // Function to adjust filter position based on header height
+    // Function to adjust filter position based on header height and responsiveness
     function adjustFilterPosition() {
         const filterInterface = document.getElementById('location-filter-interface');
         if (!filterInterface) return;
         
-        // Find the GitHub header
-        const header = document.querySelector('.AppHeader');
-        if (header) {
-            const headerHeight = header.offsetHeight;
-            // Add some padding (20px) below the header
-            filterInterface.style.marginTop = (headerHeight + 20) + 'px';
-        } else {
-            // Fallback if header not found - use a reasonable default
-            filterInterface.style.marginTop = '100px';
+        // If the element has been manually positioned by dragging, reapply constraints
+        if (currentPosition.x !== 0 || currentPosition.y !== 0) {
+            updatePosition(currentPosition.x, currentPosition.y);
+            return;
+        }
+        
+        // For initial positioning, use CSS right positioning
+        setInitialPosition();
+    }
+
+    // Function to ensure interface stays within bounds when expanding/collapsing
+    function ensureWithinBounds() {
+        const filterInterface = document.getElementById('location-filter-interface');
+        if (!filterInterface) return;
+        if (isDragging) return;
+        
+        // If already manually positioned (dragged), reapply constraints with current state and animation
+        if (currentPosition.x !== 0 || currentPosition.y !== 0) {
+            animatedRepositionToConstraints(currentPosition.x, currentPosition.y);
+            return;
+        }
+        
+        // For right-positioned interface, check if it goes off screen when expanded
+        const rect = filterInterface.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        
+        if (rect.left < 15) {
+            // Interface is going off the left side, switch to manual positioning with animation
+            const newX = 15;
+            const newY = rect.top;
+            animatedRepositionToConstraints(newX, newY);
+        } else if (rect.right > viewportWidth - 15) {
+            // Interface is going off the right side, switch to manual positioning with animation
+            const newX = viewportWidth - rect.width - 15;
+            const newY = rect.top;
+            animatedRepositionToConstraints(newX, newY);
         }
     }
 
@@ -715,8 +1008,8 @@
         
         createDropdownInterface();
         
-        // Adjust position after creating interface
-        setTimeout(adjustFilterPosition, 100);
+        // Set initial position after creating interface
+        setTimeout(setInitialPosition, 100);
         
         // Restore filter state if it was previously enabled
         if (savedFilterState && targetCities.length > 0) {
@@ -738,7 +1031,14 @@
         });
         
         // Listen for window resize to adjust position (throttled)
-        window.addEventListener('resize', throttle(adjustFilterPosition, 100));
+        window.addEventListener('resize', throttle(() => {
+            if (isDragging) return;
+            if (currentPosition.x !== 0 || currentPosition.y !== 0) {
+                animatedRepositionToConstraints(currentPosition.x, currentPosition.y);
+            } else {
+                adjustFilterPosition();
+            }
+        }, 100));
         
         // Listen for scroll to ensure filter stays visible (throttled)
         window.addEventListener('scroll', throttle(adjustFilterPosition, 100));
