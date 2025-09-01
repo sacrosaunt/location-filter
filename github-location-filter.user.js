@@ -96,7 +96,7 @@
                     </div>
                 </div>
                 <div class="cities-section">
-                    <label>Filter Cities:</label>
+                    <label>Selected Cities:</label>
                     <div class="cities-list" id="cities-list"></div>
                 </div>
             </div>
@@ -244,11 +244,13 @@
             .input-group {
                 display: flex;
                 gap: 5px;
+                width: 100%;
             }
 
             #city-input {
-                flex: 0 0 140px;
-                width: 140px;
+                flex: 1 1 auto;
+                width: auto;
+                min-width: 0;
                 padding: 6px 8px;
                 border: 1px solid #ddd;
                 border-radius: 4px;
@@ -266,6 +268,7 @@
                 cursor: pointer;
                 font-size: 13px;
                 font-weight: 500;
+                white-space: nowrap;
             }
 
             #add-city-btn:hover {
@@ -342,8 +345,9 @@
                     width: 220px;
                 }
                 #city-input {
-                    flex-basis: 130px;
-                    width: 130px;
+                    flex: 1 1 auto;
+                    width: auto;
+                    min-width: 0;
                 }
             }
 
@@ -355,8 +359,9 @@
                     width: 200px;
                 }
                 #city-input {
-                    flex-basis: 120px;
-                    width: 120px;
+                    flex: 1 1 auto;
+                    width: auto;
+                    min-width: 0;
                 }
             }
 
